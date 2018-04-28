@@ -1,0 +1,319 @@
+<!--
+Title: Javascript Perlin Noise Implementation Island Simulation
+Author: Liam Speakman
+Notes: N/A
+Copyright (C) 2017 Liam Speakman <lspeakman001@gmail.com>
+You are free to copy, redistribute, and modify this work with no permission from the author 
+-->
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>Ship Shooter</title>
+		<link rel="stylesheet" href="style.css">
+		<style>
+		
+		</style>
+	</head>
+	<body>
+	 <!--<img id="Hero" src="hero.png" style="display: none;"/>-->
+	 <div style="width:1280px; height:720px; margin: 0 auto; padding: 5px;"> 
+	<canvas id="canvas" width="1280" height="720" margin: 0 auto;>No canvas support is available on this browser</canvas>
+	</div> 
+		<script src="utils.js"></script>		
+		<script src="Char1.js"></script>
+		<script src="keycode.js"></script>
+		<script src="Level.js"></script>
+		<script src="Projectile.js"></script>
+		<script src="Wall.js"></script>
+		<script src="Star.js"></script>
+		<script src="Particle.js"></script>
+		<script>
+		window.onload = function(){
+		var canvas = document.getElementById('canvas'),
+			context = canvas.getContext('2d'), 
+			mouse = utils.captureMouse(canvas);
+			hero = new Char1((canvas.width/2)-64,canvas.height/2);
+			gameOver = new Image();
+			gameOver.src='gameOver.png';
+			context.imageSmoothingEnabled= false;
+			context.mozImageSmoothingEnabled = false;
+			lvl = new Level();
+			stars = [];
+			score = 0;
+			upgradeFactor=0;
+			upgradeLevel=1;
+			deathTimer = 0;
+			particles = [];
+			projectiles = [];
+			pressed=false;
+			walls = [
+				new Wall(Math.floor((Math.random() * (canvas.width-256)) + 1),-64 - (canvas.height/4)*4,50+score),
+				new Wall(Math.floor((Math.random() * (canvas.width-256)) + 1),-64 - (canvas.height/4)*3,50+score),
+				new Wall(Math.floor((Math.random() * (canvas.width-256)) + 1),-64 - (canvas.height/4)*2,50+score),
+				new Wall(Math.floor((Math.random() * (canvas.width-256)) + 1),-64 - (canvas.height/4)*1,50+score)];
+			for(i = 0;i<400;i++)
+				stars.push(new Star(Math.floor((Math.random() * (canvas.width))),Math.floor((Math.random() * (canvas.height)))));
+			angle = 0;
+			wobblePower = 255;
+			basicWobbleTimer = 0;
+			wobbleCost = 3;
+			audio = new Audio('Wobble.mp3');
+			music = new Audio('Son Of A Rocket.mp3');
+			music.loop = true;
+			music.play();
+			vSet = false;
+			allowGrowth = true;
+			function onKeyboardDown(event){
+			switch(event.keyCode){
+			case keycode.W:
+				hero.up=true;
+				break;
+			case keycode.S:
+				hero.down=true;
+				break;
+			case keycode.A:
+				hero.currFrame = 0;
+				hero.left=true;
+				break;
+			case keycode.D:
+				hero.currFrame = 128;
+				hero.right=true;
+				break;
+			case keycode.SPACE:
+			event.preventDefault(); 
+			if(!pressed){
+				projectiles.push(new Projectile(hero.x+32,hero.y));
+				projectiles.push(new Projectile(hero.x+hero.width-52,hero.y));
+				var pew = new Audio('Pew.mp3');
+				pew.play();
+				pressed=true;
+				}
+				break;
+			case keycode.V:
+				if(wobblePower >= wobbleCost){
+					vSet = true;
+					audio.loop = true;
+					audio.play();
+				}
+				break;
+			case keycode.U:
+				if(upgradeFactor>=10){
+					upgradeLevel++;
+					upgradeFactor-=10;
+				}
+				break;
+			default:
+				console.log(event.keyCode);
+			}
+			}
+			function onKeyboardUp(event){
+			switch(event.keyCode){
+			case keycode.W:
+				hero.currFrame = 64;
+				hero.up=false;
+				break;
+			case keycode.S:
+				hero.currFrame = 64;
+				hero.down=false;
+				break;
+			case keycode.A:
+				hero.currFrame = 64;
+				hero.left=false;
+				break;
+			case keycode.D:
+				hero.currFrame = 64;
+				hero.right=false;
+				break;
+			case keycode.V:
+				vSet = false;
+				audio.pause();
+				break;
+			case keycode.SPACE:
+			event.preventDefault(); 
+				pressed=false;
+				break;
+			default:
+				console.log(event.keyCode);
+			}
+			}
+			window.addEventListener('keydown', onKeyboardDown, false);			
+			window.addEventListener('keyup', onKeyboardUp, false);	
+			window.addEventListener('mousedown', function(){
+				console.log("x: " + mouse.x + ", y: " + mouse.y);
+				//hero.x=mouse.x;hero.y=mouse.y;
+			}, false);
+			//setInterval(function() {
+			//	update();
+			//}, 1000/30);
+			//function update(){}
+			(function drawFrame(){
+			if(hero.x>canvas.width-hero.width){
+				hero.x = canvas.width-hero.width;
+			}
+			if(hero.x<0){
+				hero.x=0;
+			}
+			if(hero.y<0){
+				hero.y=0;
+			}
+			if(hero.y>canvas.height-hero.width){
+				hero.y=canvas.height-hero.width;
+			}
+			hero.update();
+			lvl.update();
+			window.requestAnimationFrame(drawFrame, canvas);
+			context.clearRect(0,0,canvas.width, canvas.height);
+			context.fillStyle = "#00005F";
+			context.fillRect(0,0,canvas.width,canvas.height);
+			for(i = 0;i<stars.length;i++){
+				
+				if(stars[i].y >= canvas.height+16){
+					stars.splice(i, 1);
+				}
+				stars[i].update();
+				stars[i].draw(context);
+				//walls.shift();
+			}
+				particles.push(new Particle(hero.x+hero.width/2,hero.y+hero.width/2,0,hero.speed * 2));
+			for(i = 0;i<particles.length;i++){
+				if(particles[i] !=null)
+				if(particles[i].a <= .1){
+					particles.splice(i, 1);
+				}
+				particles[i].update();
+				particles[i].draw(context);
+			}
+			hero.draw(context,lvl);
+			
+			for(i = 0;i < projectiles.length;i++){
+			projectiles[i].update();
+			projectiles[i].draw(context);
+			}
+			
+			if(walls.length<(4*(parseInt(upgradeLevel/4+1)))){
+			walls.push(new Wall(Math.floor((Math.random() * (canvas.width-256))),-256,50+score));
+			}
+			
+			if(stars.length<400){
+			stars.push(new Star(Math.floor((Math.random() * (canvas.width))),-16));
+			}
+			
+			for(i = 0;i < walls.length;i++){
+			if(walls[i].health<=0){
+				score+=1;
+				upgradeFactor+=1;
+				new Audio('Explosion.mp3').play();
+				walls.splice(i, 1);
+			}
+			if(walls[i] != null)
+			if(utils.intersectsPoint(hero.x,0,64,hero.y,walls[i].x,walls[i].y,256,256) && vSet){
+				walls[i].health-=5;
+			}
+			if(walls[i] != null)
+			if(utils.intersectsPoint(hero.x,hero.y,64,64,walls[i].x,walls[i].y,256,256)){
+				hero.health-=15;
+				new Audio('Dong.mp3').play();
+				walls.splice(i, 1);
+			}
+			if(walls[i] != null)
+			if(walls[i].y >= canvas.height+64){
+				walls.splice(i, 1);
+				//walls.shift();
+			}
+			
+			}
+			for(i = 0;i < walls.length;i++){
+			walls[i].update();
+			walls[i].draw(context);
+			}
+			for(i = 0;i < projectiles.length;i++){
+			for(j = 0;j < walls.length;j++){
+			if(projectiles[i] !=null)
+				if(utils.intersectsPoint(projectiles[i].x,projectiles[i].y,16,16,walls[j].x,walls[j].y,256,256)){
+					walls[j].health-=6*upgradeLevel;
+					particles.push(new Particle(projectiles[i].x,projectiles[i].y,0,0));
+					projectiles.splice(i, 1);
+				}
+			}
+			}
+			
+			if(wobblePower < wobbleCost){
+					allowGrowth = false;
+					basicWobbleTimer++;
+			}
+			
+			if(basicWobbleTimer >= 200){
+				allowGrowth = true;
+				basicWobbleTimer=0;
+			}
+			if(wobblePower < wobbleCost){
+				vSet = false;
+				audio.pause();
+			}
+			
+			if(hero.health <= 0){
+				deathTimer++;
+				context.drawImage(gameOver,0,0,1280,720);
+				if(deathTimer>=200){
+					reInit();
+				}
+			}
+
+			if(wobblePower < 255 && !vSet && allowGrowth){
+				wobblePower+=wobbleCost;
+			}
+			if(vSet){
+				if(wobblePower >= wobbleCost){
+					wobblePower-=wobbleCost;
+				}
+				
+				angle+=3.5;
+				context.fillStyle = "red";
+				context.fillRect(hero.x+(hero.width/2)-2,0,(-Math.sin(angle)*10),hero.y);
+				context.fillStyle = "#8F0000";
+				context.fillRect(hero.x+(hero.width/2)-2,0,(Math.sin(angle)*10),hero.y);
+			}
+			context.fillStyle = "white";
+			context.font = "bold 16px Arial";
+			context.fillText("Health:" + hero.health + "X:" + parseInt(hero.x)+ " Y:" + parseInt(hero.y), 16, 16);
+			context.fillText("Score:" + score, 16, 96);
+			context.fillText("Upgrade points:" + upgradeFactor, 16, 128);
+			context.fillText("Level:" + upgradeLevel, 16, 144);
+			context.fillText("You may upgrade:" + parseInt(upgradeFactor/10) + " times.", 16, 160);
+			context.fillStyle = "rgb("+(255-wobblePower)+","+wobblePower+",0)";
+			context.fillRect(0, 16, wobblePower*2, 48);
+			}());
+			
+		};
+		function reInit(){
+			hero.health=100;
+				score = 0;
+				particles = [];
+			projectiles = [];
+			walls = [
+				new Wall(Math.floor((Math.random() * (canvas.width-256)) + 1),-64 - (canvas.height/4)*4,50+score),
+				new Wall(Math.floor((Math.random() * (canvas.width-256)) + 1),-64 - (canvas.height/4)*3,50+score),
+				new Wall(Math.floor((Math.random() * (canvas.width-256)) + 1),-64 - (canvas.height/4)*2,50+score),
+				new Wall(Math.floor((Math.random() * (canvas.width-256)) + 1),-64 - (canvas.height/4)*1,50+score)];
+				wobblePower = 255;
+				hero.x=(canvas.width/2)-64;
+				hero.y=canvas.height/2;
+				music.pause();
+				music = new Audio('Son Of A Rocket.mp3');
+				music.play();
+				allowGrowth = true;
+				deathTimer=0;
+				upgradeFactor=0;
+				upgradeLevel=1;
+		}
+		</script>
+		<p>WASD to move</p>
+		<p>V to use laser</p>
+		<p>Use U to upgrade your cannon</p>
+		<p>Created in 2 days by Liam Speakman</p>
+		<p>The music is Son Of A Rocket by Kevin Mcleod</p>
+		<a href='http://store.payloadz.com/details/1840699-music-electronica-son-of-a-rocket.html'>click here to buy his track.</a>
+		<a href='http://incompetech.com/wordpress/'>click here to go to his site</a>
+	</body>
+</html>

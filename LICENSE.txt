@@ -1,0 +1,6 @@
+You have the right to:
+	1. Copy and re-distribute this code in any medium or format
+	2. build upon and change the original source code for any purpose(individual to commercial)
+As long as you follow these terms you may have the right to do above:
+	Must give proper credit to the original author.
+	otherwise there is no restrictions.
